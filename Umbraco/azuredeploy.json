@@ -162,7 +162,7 @@
         "emailReceivers": [
           {
             "name": "test",
-            "emailAddress": "[parameters('emails')]",
+            "emailAddress": "noreply@bob.com",
             "useCommonAlertSchema": true
           }
         ]
