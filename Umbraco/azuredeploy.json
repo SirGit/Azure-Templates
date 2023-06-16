@@ -162,7 +162,7 @@
         "emailReceivers": [
           {
             "name": "test",
-            "emailAddress": "[parameters('emails')[0]]",
+            "emailAddress": "[parameters('emails')]",
             "useCommonAlertSchema": true
           }
         ]
