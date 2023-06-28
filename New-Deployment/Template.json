@@ -1,0 +1,923 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "database_server_name": {
+            "defaultValue": "umbracotestdatabaseserver",
+            "type": "String"
+        },
+        "sqlDBName": {
+            "type": "string",
+            "defaultValue": "Umbraco",
+            "metadata": {
+                "description": "The name of the SQL Database."
+            }
+        },
+        "redis_cache_server": {
+            "defaultValue": "telford-umbracotest-redis",
+            "type": "String"
+        },
+        "webapp_umbraco_backend": {
+            "defaultValue": "telford-umbracotest-backend",
+            "type": "String"
+        },
+        "webapp_umbraco_frontend": {
+            "defaultValue": "telford-umbracotest-frontend",
+            "type": "String"
+        },
+        "dbAdministratorLogin": {
+            "defaultValue": "superuser",
+            "type": "string",
+            "metadata": {
+                "description": "Database admin user"
+            }
+        },
+        "dbAdministratorLoginPassword": {
+            "type": "securestring",
+            "metadata": {
+                "description": "Database admin user password"
+            }
+        },
+        "serverfarms_backend_name": {
+            "defaultValue": "telford-umbracotest-backend",
+            "type": "String"
+        },
+        "serverfarms_frontend_name": {
+            "defaultValue": "telford-umbracotest-frontend",
+            "type": "String"
+        },
+        "storageAccount_name": {
+            "defaultValue": "umbracotest-assets",
+            "type": "String"
+        },
+        "minimumCapacity": {
+            "type": "Int",
+            "defaultValue": 2,
+            "metadata": {
+                "description": "The minimum capacity.  Autoscale engine will ensure the instance count is at least this value."
+            }
+        },
+        "maximumCapacity": {
+            "type": "Int",
+            "defaultValue": 5,
+            "metadata": {
+                "description": "The maximum capacity.  Autoscale engine will ensure the instance count is not greater than this value."
+            }
+        },
+        "defaultCapacity": {
+            "type": "Int",
+            "defaultValue": 5,
+            "metadata": {
+                "description": "The default capacity.  Autoscale engine will preventively set the instance count to be this value if it can not find any metric data."
+            }
+        },
+        "metricName": {
+            "type": "string",
+            "defaultValue": "CpuPercentage",
+            "metadata": {
+                "description": "The metric name."
+            }
+        },
+        "metricThresholdToScaleOut": {
+            "type": "Int",
+            "defaultValue": 60,
+            "metadata": {
+                "description": "The metric upper threshold.  If the metric value is above this threshold then autoscale engine will initiate scale out action."
+            }
+        },
+        "metricThresholdToScaleIn": {
+            "type": "Int",
+            "defaultValue": 20,
+            "metadata": {
+                "description": "The metric lower threshold.  If the metric value is below this threshold then autoscale engine will initiate scale in action."
+            }
+        },
+        "changePercentScaleOut": {
+            "type": "Int",
+            "defaultValue": 20,
+            "metadata": {
+                "description": "The percentage to increase the instance count when autoscale engine is initiating scale out action."
+            }
+        },
+        "changePercentScaleIn": {
+            "type": "Int",
+            "defaultValue": 10,
+            "metadata": {
+                "description": "The percentage to decrease the instance count when autoscale engine is initiating scale in action."
+            }
+        },
+        "autoscaleEnabled": {
+            "type": "Bool",
+            "defaultValue": "true",
+            "metadata": {
+                "description": "A boolean to indicate whether the autoscale policy is enabled or disabled."
+            }
+        },
+        "workspaces_defaultworkspace_38dff29f_1a78_4275_ac9b_bec6f8b9ecde_suk_externalid": {
+            "defaultValue": "/subscriptions/38dff29f-1a78-4275-ac9b-bec6f8b9ecde/resourceGroups/defaultresourcegroup-suk/providers/microsoft.operationalinsights/workspaces/defaultworkspace-38dff29f-1a78-4275-ac9b-bec6f8b9ecde-suk",
+            "type": "String"
+        }
+    },
+    "variables": {
+        "settingName": "[concat(toLower(parameters('webapp_umbraco_frontend')), '-setting')]",
+        "targetResourceId": "[resourceId('Microsoft.Web/serverFarms/', parameters('webapp_umbraco_frontend'))]",
+        "databaseName": "[concat(parameters('sqlDBName'), '-sqldb')]"
+        
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Sql/servers",
+            "apiVersion": "2022-08-01-preview",
+            "name": "[parameters('database_server_name')]",
+            "location": "[resourceGroup().location]",
+            "tags": {
+                "Cost Centre": "Shared"
+            },
+            "kind": "v12.0",
+            "properties": {
+                "administratorLogin": "superuser",
+                "administratorLoginPassword": "[parameters('dbAdministratorLoginPassword')]",
+                "version": "12.0",
+                "minimalTlsVersion": "1.2",
+                "publicNetworkAccess": "Disabled",
+                "restrictOutboundNetworkAccess": "Disabled"
+            }
+        },
+        {
+            "type": "Microsoft.Sql/servers/databases",
+            "apiVersion": "2022-05-01-preview",
+            "name": "[format('{0}/{1}', parameters('database_server_name'), parameters('sqlDBName'))]",
+            "location": "[resourceGroup().location]",
+            "sku": {
+                "name": "Standard",
+                "tier": "Standard"
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Sql/servers', parameters('database_server_name'))]"
+            ]
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts",
+            "apiVersion": "2022-09-01",
+            "name": "[parameters('storageAccount_name')]",
+            "location": "[resourceGroup().location]",
+            "tags": {
+                "Cost Centre": "Shared"
+            },
+            "sku": {
+                "name": "Standard_LRS",
+                "tier": "Standard"
+            },
+            "kind": "StorageV2",
+            "properties": {
+                "dnsEndpointType": "Standard",
+                "defaultToOAuthAuthentication": false,
+                "publicNetworkAccess": "Enabled",
+                "allowCrossTenantReplication": true,
+                "minimumTlsVersion": "TLS1_2",
+                "allowBlobPublicAccess": true,
+                "allowSharedKeyAccess": true,
+                "networkAcls": {
+                    "bypass": "AzureServices",
+                    "virtualNetworkRules": [],
+                    "ipRules": [],
+                    "defaultAction": "Allow"
+                },
+                "supportsHttpsTrafficOnly": true,
+                "encryption": {
+                    "requireInfrastructureEncryption": false,
+                    "services": {
+                        "file": {
+                            "keyType": "Account",
+                            "enabled": true
+                        },
+                        "blob": {
+                            "keyType": "Account",
+                            "enabled": true
+                        }
+                    },
+                    "keySource": "Microsoft.Storage"
+                },
+                "accessTier": "Hot"
+            }
+        },
+        {
+            "type": "Microsoft.Web/serverfarms",
+            "apiVersion": "2022-09-01",
+            "name": "[parameters('serverfarms_backend_name')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Sql/servers', parameters('database_server_name'))]"
+            ],
+            "tags": {
+                "Cost Centre": "Shared"
+            },
+            "sku": {
+                "name": "S1",
+                "tier": "Standard",
+                "size": "S1",
+                "family": "S",
+                "capacity": 1
+            },
+            "kind": "app",
+            "properties": {
+                "perSiteScaling": false,
+                "elasticScaleEnabled": false,
+                "maximumElasticWorkerCount": 1,
+                "isSpot": false,
+                "reserved": false,
+                "isXenon": false,
+                "hyperV": false,
+                "targetWorkerCount": 0,
+                "targetWorkerSizeId": 0,
+                "zoneRedundant": false
+            }
+        },
+        {
+            "type": "Microsoft.Web/serverfarms",
+            "apiVersion": "2022-09-01",
+            "name": "[parameters('serverfarms_frontend_name')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Sql/servers', parameters('database_server_name'))]"
+            ],
+            "tags": {
+                "Cost Centre": "Shared"
+            },
+            "sku": {
+                "name": "S1",
+                "tier": "Standard",
+                "size": "S1",
+                "family": "S",
+                "capacity": 1
+            },
+            "kind": "app",
+            "properties": {
+                "perSiteScaling": false,
+                "elasticScaleEnabled": false,
+                "maximumElasticWorkerCount": 1,
+                "isSpot": false,
+                "reserved": false,
+                "isXenon": false,
+                "hyperV": false,
+                "targetWorkerCount": 0,
+                "targetWorkerSizeId": 0,
+                "zoneRedundant": false
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts/blobServices",
+            "apiVersion": "2022-09-01",
+            "name": "[concat(parameters('storageAccount_name'), '/default')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccount_name'))]"
+            ],
+            "sku": {
+                "name": "Standard_LRS",
+                "tier": "Standard"
+            },
+            "properties": {
+                "cors": {
+                    "corsRules": []
+                },
+                "deleteRetentionPolicy": {
+                    "allowPermanentDelete": false,
+                    "enabled": true,
+                    "days": 7
+                },
+                "isVersioningEnabled": false,
+                "changeFeed": {
+                    "enabled": false
+                },
+                "restorePolicy": {
+                    "enabled": false
+                },
+                "containerDeleteRetentionPolicy": {
+                    "enabled": true,
+                    "days": 7
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts/queueServices",
+            "apiVersion": "2022-09-01",
+            "name": "[concat(parameters('storageAccount_name'), '/default')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccount_name'))]"
+            ],
+            "properties": {
+                "cors": {
+                    "corsRules": []
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts/tableServices",
+            "apiVersion": "2022-09-01",
+            "name": "[concat(parameters('storageAccount_name'), '/default')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccount_name'))]"
+            ],
+            "properties": {
+                "cors": {
+                    "corsRules": []
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites",
+            "apiVersion": "2022-09-01",
+            "name": "[parameters('webapp_umbraco_backend')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/serverfarms', parameters('serverfarms_backend_name'))]"
+            ],
+            "tags": {
+                "Cost Centre": "Shared"
+            },
+            "kind": "app",
+            "properties": {
+                "enabled": true,
+                "hostNameSslStates": [
+                    {
+                        "name": "[concat(parameters('webapp_umbraco_backend'), '.azurewebsites.net')]",
+                        "sslState": "Disabled",
+                        "hostType": "Standard"
+                    },
+                    {
+                        "name": "[concat(parameters('webapp_umbraco_backend'), '.scm.azurewebsites.net')]",
+                        "sslState": "Disabled",
+                        "hostType": "Repository"
+                    }
+                ],
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', parameters('serverfarms_backend_name'))]",
+                "reserved": false,
+                "isXenon": false,
+                "hyperV": false,
+                "vnetRouteAllEnabled": false,
+                "vnetImagePullEnabled": false,
+                "vnetContentShareEnabled": false,
+                "siteConfig": {
+                    "numberOfWorkers": 1,
+                    "acrUseManagedIdentityCreds": false,
+                    "alwaysOn": true,
+                    "http20Enabled": false,
+                    "functionAppScaleLimit": 0,
+                    "minimumElasticInstanceCount": 0,
+                    "connectionStrings": [
+                    {
+                    "name": "DataBaseConnection",
+                    "connectionString": "[concat('Data Source=tcp:', reference(parameters('database_server_name')).fullyQualifiedDomainName, ',1433;Initial Catalog=', variables('databaseName'), ';Persist Security Info=False;User ID=', parameters('dbAdministratorLogin'),';Password=', parameters('dbAdministratorLoginPassword'), ';MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;')]",
+                    "type": "SQLAzure"
+                    }
+                    ]        
+                },
+                "scmSiteAlsoStopped": false,
+                "clientAffinityEnabled": true,
+                "clientCertEnabled": false,
+                "clientCertMode": "Required",
+                "hostNamesDisabled": false,
+                "customDomainVerificationId": "B1FC36DB1AB599B65AF29EAFEE2FC910357ABA1B2ADBD22E7494B44D1C34B58B",
+                "containerSize": 0,
+                "dailyMemoryTimeQuota": 0,
+                "httpsOnly": true,
+                "redundancyMode": "None",
+                "publicNetworkAccess": "Enabled",
+                "storageAccountRequired": false,
+                "keyVaultReferenceIdentity": "SystemAssigned"
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites",
+            "apiVersion": "2022-09-01",
+            "name": "[parameters('webapp_umbraco_frontend')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/serverfarms', parameters('serverfarms_frontend_name'))]"
+            ],
+            "tags": {
+                "Cost Centre": "Shared"
+            },
+            "kind": "app",
+            "properties": {
+                "enabled": true,
+                "hostNameSslStates": [
+                    {
+                        "name": "[concat(parameters('webapp_umbraco_frontend'), '.azurewebsites.net')]",
+                        "sslState": "Disabled",
+                        "hostType": "Standard"
+                    },
+                    {
+                        "name": "[concat(parameters('webapp_umbraco_frontend'), '.scm.azurewebsites.net')]",
+                        "sslState": "Disabled",
+                        "hostType": "Repository"
+                    }
+                ],
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', parameters('serverfarms_frontend_name'))]",
+                "reserved": false,
+                "isXenon": false,
+                "hyperV": false,
+                "vnetRouteAllEnabled": false,
+                "vnetImagePullEnabled": false,
+                "vnetContentShareEnabled": false,
+                "siteConfig": {
+                    "numberOfWorkers": 1,
+                    "acrUseManagedIdentityCreds": false,
+                    "alwaysOn": true,
+                    "http20Enabled": false,
+                    "functionAppScaleLimit": 0,
+                    "minimumElasticInstanceCount": 0,
+                    "connectionStrings": [
+                    {
+                    "name": "DataBaseConnection",
+                    "connectionString": "[concat('Data Source=tcp:', reference(parameters('database_server_name')).fullyQualifiedDomainName, ',1433;Initial Catalog=', variables('databaseName'), ';Persist Security Info=False;User ID=', parameters('dbAdministratorLogin'),';Password=', parameters('dbAdministratorLoginPassword'), ';MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;')]",
+                    "type": "SQLAzure"
+                    }
+                    ]        
+                },
+                "scmSiteAlsoStopped": false,
+                "clientAffinityEnabled": true,
+                "clientCertEnabled": false,
+                "clientCertMode": "Required",
+                "hostNamesDisabled": false,
+                "customDomainVerificationId": "B1FC36DB1AB599B65AF29EAFEE2FC910357ABA1B2ADBD22E7494B44D1C34B58B",
+                "containerSize": 0,
+                "dailyMemoryTimeQuota": 0,
+                "httpsOnly": true,
+                "redundancyMode": "None",
+                "publicNetworkAccess": "Enabled",
+                "storageAccountRequired": false,
+                "keyVaultReferenceIdentity": "SystemAssigned"
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites/basicPublishingCredentialsPolicies",
+            "apiVersion": "2022-09-01",
+            "name": "[concat(parameters('webapp_umbraco_backend'), '/ftp')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/sites', parameters('webapp_umbraco_backend'))]"
+            ],
+            "tags": {
+                "Cost Centre": "Shared"
+            },
+            "properties": {
+                "allow": true
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites/basicPublishingCredentialsPolicies",
+            "apiVersion": "2022-09-01",
+            "name": "[concat(parameters('webapp_umbraco_frontend'), '/ftp')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/sites', parameters('webapp_umbraco_frontend'))]"
+            ],
+            "tags": {
+                "Cost Centre": "Shared"
+            },
+            "properties": {
+                "allow": true
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites/basicPublishingCredentialsPolicies",
+            "apiVersion": "2022-09-01",
+            "name": "[concat(parameters('webapp_umbraco_backend'), '/scm')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/sites', parameters('webapp_umbraco_backend'))]"
+            ],
+            "tags": {
+                "Cost Centre": "Shared"
+            },
+            "properties": {
+                "allow": true
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites/basicPublishingCredentialsPolicies",
+            "apiVersion": "2022-09-01",
+            "name": "[concat(parameters('webapp_umbraco_frontend'), '/scm')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/sites', parameters('webapp_umbraco_frontend'))]"
+            ],
+            "tags": {
+                "Cost Centre": "Shared"
+            },
+            "properties": {
+                "allow": true
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites/config",
+            "apiVersion": "2022-09-01",
+            "name": "[concat(parameters('webapp_umbraco_backend'), '/web')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/sites', parameters('webapp_umbraco_backend'))]"
+            ],
+            "tags": {
+                "Cost Centre": "Shared"
+            },
+            "properties": {
+                "numberOfWorkers": 1,
+                "defaultDocuments": [
+                    "Default.htm",
+                    "Default.html",
+                    "Default.asp",
+                    "index.htm",
+                    "index.html",
+                    "iisstart.htm",
+                    "default.aspx",
+                    "index.php",
+                    "hostingstart.html"
+                ],
+                "netFrameworkVersion": "v7.0",
+                "requestTracingEnabled": false,
+                "remoteDebuggingEnabled": false,
+                "httpLoggingEnabled": false,
+                "acrUseManagedIdentityCreds": false,
+                "logsDirectorySizeLimit": 35,
+                "detailedErrorLoggingEnabled": false,
+                "publishingUsername": "$telford-umbracotest-backend",
+                "scmType": "None",
+                "use32BitWorkerProcess": true,
+                "webSocketsEnabled": false,
+                "alwaysOn": true,
+                "managedPipelineMode": "Integrated",
+                "virtualApplications": [
+                    {
+                        "virtualPath": "/",
+                        "physicalPath": "site\\wwwroot",
+                        "preloadEnabled": true
+                    }
+                ],
+                "loadBalancing": "LeastRequests",
+                "experiments": {
+                    "rampUpRules": []
+                },
+                "autoHealEnabled": false,
+                "vnetRouteAllEnabled": false,
+                "vnetPrivatePortsCount": 0,
+                "publicNetworkAccess": "Enabled",
+                "localMySqlEnabled": false,
+                "ipSecurityRestrictions": [
+                    {
+                        "ipAddress": "Any",
+                        "action": "Allow",
+                        "priority": 2147483647,
+                        "name": "Allow all",
+                        "description": "Allow all access"
+                    }
+                ],
+                "scmIpSecurityRestrictions": [
+                    {
+                        "ipAddress": "Any",
+                        "action": "Allow",
+                        "priority": 2147483647,
+                        "name": "Allow all",
+                        "description": "Allow all access"
+                    }
+                ],
+                "scmIpSecurityRestrictionsUseMain": false,
+                "http20Enabled": false,
+                "minTlsVersion": "1.2",
+                "scmMinTlsVersion": "1.2",
+                "ftpsState": "FtpsOnly",
+                "preWarmedInstanceCount": 0,
+                "elasticWebAppScaleLimit": 0,
+                "functionsRuntimeScaleMonitoringEnabled": false,
+                "minimumElasticInstanceCount": 0,
+                "azureStorageAccounts": {}
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites/config",
+            "apiVersion": "2022-09-01",
+            "name": "[concat(parameters('webapp_umbraco_frontend'), '/web')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/sites', parameters('webapp_umbraco_frontend'))]"
+            ],
+            "tags": {
+                "Cost Centre": "Shared"
+            },
+            "properties": {
+                "numberOfWorkers": 1,
+                "defaultDocuments": [
+                    "Default.htm",
+                    "Default.html",
+                    "Default.asp",
+                    "index.htm",
+                    "index.html",
+                    "iisstart.htm",
+                    "default.aspx",
+                    "index.php",
+                    "hostingstart.html"
+                ],
+                "netFrameworkVersion": "v7.0",
+                "requestTracingEnabled": false,
+                "remoteDebuggingEnabled": false,
+                "httpLoggingEnabled": false,
+                "acrUseManagedIdentityCreds": false,
+                "logsDirectorySizeLimit": 35,
+                "detailedErrorLoggingEnabled": false,
+                "publishingUsername": "$telford-umbracotest-frontend",
+                "scmType": "None",
+                "use32BitWorkerProcess": true,
+                "webSocketsEnabled": false,
+                "alwaysOn": true,
+                "managedPipelineMode": "Integrated",
+                "virtualApplications": [
+                    {
+                        "virtualPath": "/",
+                        "physicalPath": "site\\wwwroot",
+                        "preloadEnabled": true
+                    }
+                ],
+                "loadBalancing": "LeastRequests",
+                "experiments": {
+                    "rampUpRules": []
+                },
+                "autoHealEnabled": false,
+                "vnetRouteAllEnabled": false,
+                "vnetPrivatePortsCount": 0,
+                "publicNetworkAccess": "Enabled",
+                "localMySqlEnabled": false,
+                "ipSecurityRestrictions": [
+                    {
+                        "ipAddress": "Any",
+                        "action": "Allow",
+                        "priority": 2147483647,
+                        "name": "Allow all",
+                        "description": "Allow all access"
+                    }
+                ],
+                "scmIpSecurityRestrictions": [
+                    {
+                        "ipAddress": "Any",
+                        "action": "Allow",
+                        "priority": 2147483647,
+                        "name": "Allow all",
+                        "description": "Allow all access"
+                    }
+                ],
+                "scmIpSecurityRestrictionsUseMain": false,
+                "http20Enabled": false,
+                "minTlsVersion": "1.2",
+                "scmMinTlsVersion": "1.2",
+                "ftpsState": "FtpsOnly",
+                "preWarmedInstanceCount": 0,
+                "elasticWebAppScaleLimit": 0,
+                "functionsRuntimeScaleMonitoringEnabled": false,
+                "minimumElasticInstanceCount": 0,
+                "azureStorageAccounts": {}
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites/hostNameBindings",
+            "apiVersion": "2022-09-01",
+            "name": "[concat(parameters('webapp_umbraco_backend'), '/', parameters('webapp_umbraco_backend'), '.azurewebsites.net')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/sites', parameters('webapp_umbraco_backend'))]"
+            ],
+            "properties": {
+                "siteName": "[parameters('webapp_umbraco_backend')]",
+                "hostNameType": "Verified"
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites/hostNameBindings",
+            "apiVersion": "2022-09-01",
+            "name": "[concat(parameters('webapp_umbraco_frontend'), '/', parameters('webapp_umbraco_frontend'), '.azurewebsites.net')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/sites', parameters('webapp_umbraco_frontend'))]"
+            ],
+            "properties": {
+                "siteName": "[parameters('webapp_umbraco_frontend')]",
+                "hostNameType": "Verified"
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+            "apiVersion": "2022-09-01",
+            "name": "[concat(parameters('storageAccount_name'), '/default/assets')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts/blobServices', parameters('storageAccount_name'), 'default')]",
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccount_name'))]"
+            ],
+            "properties": {
+                "immutableStorageWithVersioning": {
+                    "enabled": false
+                },
+                "defaultEncryptionScope": "$account-encryption-key",
+                "denyEncryptionScopeOverride": false,
+                "publicAccess": "Blob"
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+            "apiVersion": "2022-09-01",
+            "name": "[concat(parameters('storageAccount_name'), '/default/cache')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts/blobServices', parameters('storageAccount_name'), 'default')]",
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccount_name'))]"
+            ],
+            "properties": {
+                "immutableStorageWithVersioning": {
+                    "enabled": false
+                },
+                "defaultEncryptionScope": "$account-encryption-key",
+                "denyEncryptionScopeOverride": false,
+                "publicAccess": "Blob"
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+            "apiVersion": "2022-09-01",
+            "name": "[concat(parameters('storageAccount_name'), '/default/media')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts/blobServices', parameters('storageAccount_name'), 'default')]",
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccount_name'))]"
+            ],
+            "properties": {
+                "immutableStorageWithVersioning": {
+                    "enabled": false
+                },
+                "defaultEncryptionScope": "$account-encryption-key",
+                "denyEncryptionScopeOverride": false,
+                "publicAccess": "Blob"
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites/siteextensions",
+            "apiVersion": "2022-09-01",
+            "name": "[concat(parameters('webapp_umbraco_backend'), '/Microsoft.AspNetCore.AzureAppServices.SiteExtension')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/sites', parameters('webapp_umbraco_backend'))]"
+            ]
+        },
+        {
+            "type": "Microsoft.Web/sites/siteextensions",
+            "apiVersion": "2022-09-01",
+            "name": "[concat(parameters('webapp_umbraco_frontend'), '/Microsoft.AspNetCore.AzureAppServices.SiteExtension')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/sites', parameters('webapp_umbraco_frontend'))]"
+            ]
+        },
+        {
+            "type": "Microsoft.Insights/autoscalesettings",
+            "name": "[variables('settingName')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/serverfarms', parameters('webapp_umbraco_frontend'))]"
+            ],
+            "apiVersion": "2014-04-01",
+            "location": "[resourceGroup().location]",
+            "properties": {
+                "profiles": [
+                    {
+                        "name": "DefaultAutoscaleProfile",
+                        "capacity": {
+                            "minimum": "[parameters('minimumCapacity')]",
+                            "maximum": "[parameters('maximumCapacity')]",
+                            "default": "[parameters('defaultCapacity')]"
+                        },
+                        "rules": [
+                            {
+                                "metricTrigger": {
+                                    "metricName": "[parameters('metricName')]",
+                                    "metricResourceUri": "[variables('targetResourceId')]",
+                                    "timeGrain": "PT5M",
+                                    "statistic": "Average",
+                                    "timeWindow": "PT10M",
+                                    "timeAggregation": "Average",
+                                    "operator": "GreaterThan",
+                                    "threshold": "[parameters('metricThresholdToScaleOut')]"
+                                },
+                                "scaleAction": {
+                                    "direction": "Increase",
+                                    "type": "PercentChangeCount",
+                                    "value": "[parameters('changePercentScaleOut')]",
+                                    "cooldown": "PT10M"
+                                }
+                            },
+                            {
+                                "metricTrigger": {
+                                    "metricName": "[parameters('metricName')]",
+                                    "metricResourceUri": "[variables('targetResourceId')]",
+                                    "timeGrain": "PT5M",
+                                    "statistic": "Average",
+                                    "timeWindow": "PT10M",
+                                    "timeAggregation": "Average",
+                                    "operator": "LessThan",
+                                    "threshold": "[parameters('metricThresholdToScaleIn')]"
+                                },
+                                "scaleAction": {
+                                    "direction": "Decrease",
+                                    "type": "PercentChangeCount",
+                                    "value": "[parameters('changePercentScaleIn')]",
+                                    "cooldown": "PT10M"
+                                }
+                            }
+                        ]
+                    }
+                ],
+                "enabled": "[parameters('autoscaleEnabled')]",
+                "targetResourceUri": "[variables('targetResourceId')]"
+            }
+        },
+        {
+            "type": "microsoft.insights/components",
+            "apiVersion": "2020-02-02",
+            "name": "[parameters('webapp_umbraco_frontend')]",
+            "location": "[resourceGroup().location]",
+            "tags": {
+                "Cost Centre": "Shared"
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/serverfarms', parameters('serverfarms_frontend_name'))]"
+            ],
+            "kind": "web",
+            "properties": {
+                "Application_Type": "web",
+                "Flow_Type": "Redfield",
+                "Request_Source": "IbizaWebAppExtensionCreate",
+                "RetentionInDays": 90,
+                "WorkspaceResourceId": "[parameters('workspaces_defaultworkspace_38dff29f_1a78_4275_ac9b_bec6f8b9ecde_suk_externalid')]",
+                "IngestionMode": "LogAnalytics",
+                "publicNetworkAccessForIngestion": "Enabled",
+                "publicNetworkAccessForQuery": "Enabled"
+            }
+        },
+        {
+            "type": "microsoft.insights/components",
+            "apiVersion": "2020-02-02",
+            "name": "[parameters('webapp_umbraco_backend')]",
+            "location": "[resourceGroup().location]",
+            "tags": {
+                "Cost Centre": "Shared"
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/serverfarms', parameters('serverfarms_backend_name'))]"
+            ],
+            "kind": "web",
+            "properties": {
+                "Application_Type": "web",
+                "Flow_Type": "Redfield",
+                "Request_Source": "IbizaWebAppExtensionCreate",
+                "RetentionInDays": 90,
+                "WorkspaceResourceId": "[parameters('workspaces_defaultworkspace_38dff29f_1a78_4275_ac9b_bec6f8b9ecde_suk_externalid')]",
+                "IngestionMode": "LogAnalytics",
+                "publicNetworkAccessForIngestion": "Enabled",
+                "publicNetworkAccessForQuery": "Enabled"
+            }
+        },
+        {
+            "type": "Microsoft.Cache/Redis",
+            "apiVersion": "2023-05-01-preview",
+            "name": "[parameters('redis_cache_server')]",
+            "location": "[resourceGroup().location]",
+            "tags": {
+                "Cost Centre": "Shared"
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Sql/servers', parameters('database_server_name'))]"
+            ],
+            "properties": {
+                
+                "redisVersion": "6.0",
+                "sku": {
+                    "name": "Basic",
+                    "family": "C",
+                    "capacity": 0
+                },
+                "enableNonSslPort": false,
+                "minimumTlsVersion": "1.2",
+                "publicNetworkAccess": "Enabled",
+                "redisConfiguration": {
+                    "maxmemory-reserved": "30",
+                    "maxfragmentationmemory-reserved": "30",
+                    "maxmemory-delta": "30"
+                }
+            }
+        },
+        {
+        "type": "Microsoft.Sql/servers/firewallRules",
+      "apiVersion": "2021-02-01-preview",
+      "name": "[format('{0}/{1}', parameters('database_server_name'), 'AllowAllWindowsAzureIps')]",
+      "properties": {
+        "endIpAddress": "0.0.0.0",
+        "startIpAddress": "0.0.0.0"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Sql/servers', parameters('database_server_name'))]"
+      ]
+        }
+    ]
+}
