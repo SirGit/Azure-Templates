@@ -121,15 +121,16 @@
     "variables": {
         "settingName": "[concat(toLower(parameters('webapp_umbraco_frontend')), '-setting')]",
         "targetResourceId": "[resourceId('Microsoft.Web/serverFarms/', parameters('webapp_umbraco_frontend'))]",
-        "databaseName": "[concat(parameters('sqlDBName'), '-sqldb')]"
+        "databaseName": "[concat(parameters('sqlDBName'), '-sqldb')]",
+        "location": "[resourceGroup().location]"
         
     },
     "resources": [
         {
             "type": "Microsoft.Sql/servers",
-            "apiVersion": "2022-08-01-preview",
+            "apiVersion": "2021-11-01",
             "name": "[parameters('database_server_name')]",
-            "location": "[resourceGroup().location]",
+            "location": "[variables('location')]",
             "tags": {
                 "Cost Centre": "Shared"
             },
@@ -139,7 +140,7 @@
                 "administratorLoginPassword": "[parameters('dbAdministratorLoginPassword')]",
                 "version": "12.0",
                 "minimalTlsVersion": "1.2",
-                "publicNetworkAccess": "Disabled",
+                "publicNetworkAccess": "Enabled",
                 "restrictOutboundNetworkAccess": "Disabled"
             }
         },
@@ -147,10 +148,13 @@
             "type": "Microsoft.Sql/servers/databases",
             "apiVersion": "2022-05-01-preview",
             "name": "[format('{0}/{1}', parameters('database_server_name'), parameters('sqlDBName'))]",
-            "location": "[resourceGroup().location]",
+            "location": "[variables('location')]",
             "sku": {
                 "name": "Standard",
                 "tier": "Standard"
+            },
+            "properties":{
+            
             },
             "dependsOn": [
                 "[resourceId('Microsoft.Sql/servers', parameters('database_server_name'))]"
@@ -160,7 +164,7 @@
             "type": "Microsoft.Storage/storageAccounts",
             "apiVersion": "2022-09-01",
             "name": "[parameters('storageAccount_name')]",
-            "location": "[resourceGroup().location]",
+            "location": "[variables('location')]",
             "tags": {
                 "Cost Centre": "Shared"
             },
@@ -179,8 +183,6 @@
                 "allowSharedKeyAccess": true,
                 "networkAcls": {
                     "bypass": "AzureServices",
-                    "virtualNetworkRules": [],
-                    "ipRules": [],
                     "defaultAction": "Allow"
                 },
                 "supportsHttpsTrafficOnly": true,
@@ -203,9 +205,9 @@
         },
         {
             "type": "Microsoft.Web/serverfarms",
-            "apiVersion": "2022-09-01",
+            "apiVersion": "2022-03-01",
             "name": "[parameters('serverfarms_backend_name')]",
-            "location": "[resourceGroup().location]",
+            "location": "[variables('location')]",
             "dependsOn": [
                 "[resourceId('Microsoft.Sql/servers', parameters('database_server_name'))]"
             ],
@@ -235,9 +237,9 @@
         },
         {
             "type": "Microsoft.Web/serverfarms",
-            "apiVersion": "2022-09-01",
+            "apiVersion": "2022-03-01",
             "name": "[parameters('serverfarms_frontend_name')]",
-            "location": "[resourceGroup().location]",
+            "location": "[variables('location')]",
             "dependsOn": [
                 "[resourceId('Microsoft.Sql/servers', parameters('database_server_name'))]"
             ],
@@ -277,9 +279,6 @@
                 "tier": "Standard"
             },
             "properties": {
-                "cors": {
-                    "corsRules": []
-                },
                 "deleteRetentionPolicy": {
                     "allowPermanentDelete": false,
                     "enabled": true,
@@ -304,12 +303,7 @@
             "name": "[concat(parameters('storageAccount_name'), '/default')]",
             "dependsOn": [
                 "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccount_name'))]"
-            ],
-            "properties": {
-                "cors": {
-                    "corsRules": []
-                }
-            }
+            ]
         },
         {
             "type": "Microsoft.Storage/storageAccounts/tableServices",
@@ -317,18 +311,13 @@
             "name": "[concat(parameters('storageAccount_name'), '/default')]",
             "dependsOn": [
                 "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccount_name'))]"
-            ],
-            "properties": {
-                "cors": {
-                    "corsRules": []
-                }
-            }
+            ]
         },
         {
             "type": "Microsoft.Web/sites",
-            "apiVersion": "2022-09-01",
+            "apiVersion": "2022-03-01",
             "name": "[parameters('webapp_umbraco_backend')]",
-            "location": "[resourceGroup().location]",
+            "location": "[variables('location')]",
             "dependsOn": [
                 "[resourceId('Microsoft.Web/serverfarms', parameters('serverfarms_backend_name'))]"
             ],
@@ -377,7 +366,6 @@
                 "clientCertEnabled": false,
                 "clientCertMode": "Required",
                 "hostNamesDisabled": false,
-                "customDomainVerificationId": "B1FC36DB1AB599B65AF29EAFEE2FC910357ABA1B2ADBD22E7494B44D1C34B58B",
                 "containerSize": 0,
                 "dailyMemoryTimeQuota": 0,
                 "httpsOnly": true,
@@ -389,9 +377,9 @@
         },
         {
             "type": "Microsoft.Web/sites",
-            "apiVersion": "2022-09-01",
+            "apiVersion": "2022-03-01",
             "name": "[parameters('webapp_umbraco_frontend')]",
-            "location": "[resourceGroup().location]",
+            "location": "[variables('location')]",
             "dependsOn": [
                 "[resourceId('Microsoft.Web/serverfarms', parameters('serverfarms_frontend_name'))]"
             ],
@@ -440,7 +428,6 @@
                 "clientCertEnabled": false,
                 "clientCertMode": "Required",
                 "hostNamesDisabled": false,
-                "customDomainVerificationId": "B1FC36DB1AB599B65AF29EAFEE2FC910357ABA1B2ADBD22E7494B44D1C34B58B",
                 "containerSize": 0,
                 "dailyMemoryTimeQuota": 0,
                 "httpsOnly": true,
@@ -452,9 +439,9 @@
         },
         {
             "type": "Microsoft.Web/sites/basicPublishingCredentialsPolicies",
-            "apiVersion": "2022-09-01",
+            "apiVersion": "2022-03-01",
             "name": "[concat(parameters('webapp_umbraco_backend'), '/ftp')]",
-            "location": "[resourceGroup().location]",
+            "location": "[variables('location')]",
             "dependsOn": [
                 "[resourceId('Microsoft.Web/sites', parameters('webapp_umbraco_backend'))]"
             ],
@@ -467,9 +454,9 @@
         },
         {
             "type": "Microsoft.Web/sites/basicPublishingCredentialsPolicies",
-            "apiVersion": "2022-09-01",
+            "apiVersion": "2022-03-01",
             "name": "[concat(parameters('webapp_umbraco_frontend'), '/ftp')]",
-            "location": "[resourceGroup().location]",
+            "location": "[variables('location')]",
             "dependsOn": [
                 "[resourceId('Microsoft.Web/sites', parameters('webapp_umbraco_frontend'))]"
             ],
@@ -482,9 +469,9 @@
         },
         {
             "type": "Microsoft.Web/sites/basicPublishingCredentialsPolicies",
-            "apiVersion": "2022-09-01",
+            "apiVersion": "2022-03-01",
             "name": "[concat(parameters('webapp_umbraco_backend'), '/scm')]",
-            "location": "[resourceGroup().location]",
+            "location": "[variables('location')]",
             "dependsOn": [
                 "[resourceId('Microsoft.Web/sites', parameters('webapp_umbraco_backend'))]"
             ],
@@ -497,9 +484,9 @@
         },
         {
             "type": "Microsoft.Web/sites/basicPublishingCredentialsPolicies",
-            "apiVersion": "2022-09-01",
+            "apiVersion": "2022-03-01",
             "name": "[concat(parameters('webapp_umbraco_frontend'), '/scm')]",
-            "location": "[resourceGroup().location]",
+            "location": "[variables('location')]",
             "dependsOn": [
                 "[resourceId('Microsoft.Web/sites', parameters('webapp_umbraco_frontend'))]"
             ],
@@ -512,9 +499,9 @@
         },
         {
             "type": "Microsoft.Web/sites/config",
-            "apiVersion": "2022-09-01",
+            "apiVersion": "2022-03-01",
             "name": "[concat(parameters('webapp_umbraco_backend'), '/web')]",
-            "location": "[resourceGroup().location]",
+            "location": "[variables('location')]",
             "dependsOn": [
                 "[resourceId('Microsoft.Web/sites', parameters('webapp_umbraco_backend'))]"
             ],
@@ -555,9 +542,6 @@
                     }
                 ],
                 "loadBalancing": "LeastRequests",
-                "experiments": {
-                    "rampUpRules": []
-                },
                 "autoHealEnabled": false,
                 "vnetRouteAllEnabled": false,
                 "vnetPrivatePortsCount": 0,
@@ -595,9 +579,9 @@
         },
         {
             "type": "Microsoft.Web/sites/config",
-            "apiVersion": "2022-09-01",
+            "apiVersion": "2022-03-01",
             "name": "[concat(parameters('webapp_umbraco_frontend'), '/web')]",
-            "location": "[resourceGroup().location]",
+            "location": "[variables('location')]",
             "dependsOn": [
                 "[resourceId('Microsoft.Web/sites', parameters('webapp_umbraco_frontend'))]"
             ],
@@ -638,9 +622,6 @@
                     }
                 ],
                 "loadBalancing": "LeastRequests",
-                "experiments": {
-                    "rampUpRules": []
-                },
                 "autoHealEnabled": false,
                 "vnetRouteAllEnabled": false,
                 "vnetPrivatePortsCount": 0,
@@ -678,9 +659,9 @@
         },
         {
             "type": "Microsoft.Web/sites/hostNameBindings",
-            "apiVersion": "2022-09-01",
+            "apiVersion": "2022-03-01",
             "name": "[concat(parameters('webapp_umbraco_backend'), '/', parameters('webapp_umbraco_backend'), '.azurewebsites.net')]",
-            "location": "[resourceGroup().location]",
+            "location": "[variables('location')]",
             "dependsOn": [
                 "[resourceId('Microsoft.Web/sites', parameters('webapp_umbraco_backend'))]"
             ],
@@ -691,9 +672,9 @@
         },
         {
             "type": "Microsoft.Web/sites/hostNameBindings",
-            "apiVersion": "2022-09-01",
+            "apiVersion": "2022-03-01",
             "name": "[concat(parameters('webapp_umbraco_frontend'), '/', parameters('webapp_umbraco_frontend'), '.azurewebsites.net')]",
-            "location": "[resourceGroup().location]",
+            "location": "[variables('location')]",
             "dependsOn": [
                 "[resourceId('Microsoft.Web/sites', parameters('webapp_umbraco_frontend'))]"
             ],
@@ -755,18 +736,18 @@
         },
         {
             "type": "Microsoft.Web/sites/siteextensions",
-            "apiVersion": "2022-09-01",
+            "apiVersion": "2022-03-01",
             "name": "[concat(parameters('webapp_umbraco_backend'), '/Microsoft.AspNetCore.AzureAppServices.SiteExtension')]",
-            "location": "[resourceGroup().location]",
+            "location": "[variables('location')]",
             "dependsOn": [
                 "[resourceId('Microsoft.Web/sites', parameters('webapp_umbraco_backend'))]"
             ]
         },
         {
             "type": "Microsoft.Web/sites/siteextensions",
-            "apiVersion": "2022-09-01",
+            "apiVersion": "2022-03-01",
             "name": "[concat(parameters('webapp_umbraco_frontend'), '/Microsoft.AspNetCore.AzureAppServices.SiteExtension')]",
-            "location": "[resourceGroup().location]",
+            "location": "[variables('location')]",
             "dependsOn": [
                 "[resourceId('Microsoft.Web/sites', parameters('webapp_umbraco_frontend'))]"
             ]
@@ -777,8 +758,8 @@
             "dependsOn": [
                 "[resourceId('Microsoft.Web/serverfarms', parameters('webapp_umbraco_frontend'))]"
             ],
-            "apiVersion": "2014-04-01",
-            "location": "[resourceGroup().location]",
+            "apiVersion": "2022-10-01",
+            "location": "[variables('location')]",
             "properties": {
                 "profiles": [
                     {
@@ -836,7 +817,7 @@
             "type": "microsoft.insights/components",
             "apiVersion": "2020-02-02",
             "name": "[parameters('webapp_umbraco_frontend')]",
-            "location": "[resourceGroup().location]",
+            "location": "[variables('location')]",
             "tags": {
                 "Cost Centre": "Shared"
             },
@@ -859,7 +840,7 @@
             "type": "microsoft.insights/components",
             "apiVersion": "2020-02-02",
             "name": "[parameters('webapp_umbraco_backend')]",
-            "location": "[resourceGroup().location]",
+            "location": "[variables('location')]",
             "tags": {
                 "Cost Centre": "Shared"
             },
@@ -869,7 +850,7 @@
             "kind": "web",
             "properties": {
                 "Application_Type": "web",
-                "Flow_Type": "Redfield",
+                "Flow_Type": "Bluefield",
                 "Request_Source": "IbizaWebAppExtensionCreate",
                 "RetentionInDays": 90,
                 "WorkspaceResourceId": "[parameters('workspaces_defaultworkspace_38dff29f_1a78_4275_ac9b_bec6f8b9ecde_suk_externalid')]",
@@ -880,9 +861,9 @@
         },
         {
             "type": "Microsoft.Cache/Redis",
-            "apiVersion": "2023-05-01-preview",
+            "apiVersion": "2022-06-01",
             "name": "[parameters('redis_cache_server')]",
-            "location": "[resourceGroup().location]",
+            "location": "[variables('location')]",
             "tags": {
                 "Cost Centre": "Shared"
             },
@@ -909,7 +890,7 @@
         },
         {
         "type": "Microsoft.Sql/servers/firewallRules",
-      "apiVersion": "2021-02-01-preview",
+      "apiVersion": "2021-11-01",
       "name": "[format('{0}/{1}', parameters('database_server_name'), 'AllowAllWindowsAzureIps')]",
       "properties": {
         "endIpAddress": "0.0.0.0",
