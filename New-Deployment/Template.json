@@ -622,7 +622,32 @@
                     }
                 ],
                 "loadBalancing": "LeastRequests",
-                "autoHealEnabled": false,
+                 "autoHealEnabled": true,
+                "autoHealRules": {
+                    "triggers": {
+                        "privateBytesInKB": 0,
+                        "statusCodes": [
+                            {
+                                "status": 500,
+                                "subStatus": 3,
+                                "win32Status": 0,
+                                "count": 6,
+                                "timeInterval": "00:01:00"
+                            }
+                        ],
+                        "slowRequests": {
+                            "timeTaken": "00:01:00",
+                            "count": 3,
+                            "timeInterval": "00:05:00"
+                        },
+                        "slowRequestsWithPath": [],
+                        "statusCodesRange": []
+                    },
+                    "actions": {
+                        "actionType": "Recycle",
+                        "minProcessExecutionTime": "00:00:00"
+                    }
+                },
                 "vnetRouteAllEnabled": false,
                 "vnetPrivatePortsCount": 0,
                 "publicNetworkAccess": "Enabled",
