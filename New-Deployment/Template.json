@@ -113,8 +113,9 @@
                 "description": "A boolean to indicate whether the autoscale policy is enabled or disabled."
             }
         },
-        "workspaces_defaultworkspace_38dff29f_1a78_4275_ac9b_bec6f8b9ecde_suk_externalid": {
-            "defaultValue": "/subscriptions/38dff29f-1a78-4275-ac9b-bec6f8b9ecde/resourceGroups/defaultresourcegroup-suk/providers/microsoft.operationalinsights/workspaces/defaultworkspace-38dff29f-1a78-4275-ac9b-bec6f8b9ecde-suk",
+        "defaultworkspace": {
+            "type": "String",
+            "defaultValue": "",
             "type": "String"
         }
     },
@@ -853,7 +854,7 @@
                 "Flow_Type": "Bluefield",
                 "Request_Source": "rest",
                 "RetentionInDays": 90,
-                "WorkspaceResourceId": "[parameters('workspaces_defaultworkspace_38dff29f_1a78_4275_ac9b_bec6f8b9ecde_suk_externalid')]",
+                "WorkspaceResourceId": "[parameters('defaultworkspace')]",
                 "IngestionMode": "LogAnalytics",
                 "publicNetworkAccessForIngestion": "Enabled",
                 "publicNetworkAccessForQuery": "Enabled"
@@ -876,7 +877,7 @@
                 "Flow_Type": "Bluefield",
                 "Request_Source": "rest",
                 "RetentionInDays": 90,
-                "WorkspaceResourceId": "[parameters('workspaces_defaultworkspace_38dff29f_1a78_4275_ac9b_bec6f8b9ecde_suk_externalid')]",
+                "WorkspaceResourceId": "[parameters('defaultworkspace')]",
                 "IngestionMode": "LogAnalytics",
                 "publicNetworkAccessForIngestion": "Enabled",
                 "publicNetworkAccessForQuery": "Enabled"
